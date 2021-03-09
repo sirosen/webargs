@@ -1206,10 +1206,11 @@ def test_custom_default_schema_class(load_json, web_request):
     assert ret == {"value": "hello world"}
 
 
-def test_parser_pre_load(web_request):
+def test_parser_customized_location_loading(web_request):
     class CustomParser(MockRequestParser):
-        # pre-load hook to strip whitespace from query params
-        def pre_load(self, data, *, schema, req, location):
+        # customization to strip whitespace from query params
+        def load_location_data(self, *, schema, req, location):
+            data = super().load_location_data(schema=schema, req=req, location=location)
             if location == "query":
                 return {k: v.strip() for k, v in data.items()}
             return data
@@ -1230,7 +1231,7 @@ def test_parser_pre_load(web_request):
 
 
 # this test is meant to be a run of the WhitspaceStrippingFlaskParser we give
-# in the docs/advanced.rst examples for how to use pre_load
+# in the docs/advanced.rst examples for how to wrap load_location_data
 # this helps ensure that the example code is correct
 # rather than a FlaskParser, we're working with the mock parser, but it's
 # otherwise the same
@@ -1245,11 +1246,11 @@ def test_whitespace_stripping_parser_example(web_request):
         return value
 
     class WhitspaceStrippingParser(MockRequestParser):
-        def pre_load(self, location_data, *, schema, req, location):
-            if location in ("query", "form"):
-                ret = _strip_whitespace(location_data)
-                return ret
-            return location_data
+        def load_location_data(self, *, schema, req, location):
+            data = super().load_location_data(schema=schema, req=req, location=location)
+            if location in ("query", "querystring", "form"):
+                return _strip_whitespace(data)
+            return data
 
     parser = WhitspaceStrippingParser()
 

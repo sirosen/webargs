@@ -435,21 +435,24 @@ To add your own parser, extend :class:`Parser <webargs.core.Parser>` and impleme
             structure_dict_pair(r, k, v)
         return r
 
-Parser pre_load
----------------
+Customizing Data Loading
+------------------------
 
-Similar to ``@pre_load`` decorated hooks on marshmallow Schemas,
-:class:`Parser <webargs.core.Parser>` classes define a method,
-`pre_load <webargs.core.Parser.pre_load>` which can
-be overridden to provide per-parser transformations of data.
-The only way to make use of `pre_load <webargs.core.Parser.pre_load>` is to
-subclass a :class:`Parser <webargs.core.Parser>` and provide an
-implementation.
+Most data transformations can be handled by schemas, either with fields, pre_load hooks,
+or other methods. In some cases, it may be desirable to customize the handling of data
+for a specific location by overriding the loader method for that location.
 
-`pre_load <webargs.core.Parser.pre_load>` is given the data fetched from a
-location, the schema which will be used, the request object, and the location
-name which was requested. For example, to define a ``FlaskParser`` which strips
-whitespace from ``form`` and ``query`` data, one could write the following:
+However, in order to change all data loading, regardless of the type of schema being
+used and the location being parsed, the parser needs to perform the modifications. This
+can be achieved by wrapping the
+`Parser.load_location_data <webargs.core.Parser.load_location_data>` method, which
+determines which loader method to use and invokes it.
+
+As a motivating example, consider a FlaskParser which strips leading and trailing
+whitespace from argument values. We will show an implementation which only applies the
+change to query parameter loading, by overriding ``load_querystring``, and another which
+applies the transform to all data in all locations. We will also include a version which
+applies the transform via ``load_location_data``, but only for select locations.
 
 .. code-block:: python
 
@@ -467,17 +470,32 @@ whitespace from ``form`` and ``query`` data, one could write the following:
         return value
 
 
-    class WhitspaceStrippingFlaskParser(FlaskParser):
-        def pre_load(self, location_data, *, schema, req, location):
-            if location in ("query", "form"):
-                return _strip_whitespace(location_data)
-            return location_data
+    # variant 1: only applies to the query string
+    class WhitspaceStrippingQueryParser(FlaskParser):
+        def load_querystring(self, req, schema):
+            data = super().load_querystring(req, schema)
+            return _strip_whitespace(data)
 
-Note that `Parser.pre_load <webargs.core.Parser.pre_load>` is run after location
-loading but before ``Schema.load`` is called. It can therefore be called on
-multiple types of mapping objects, including
-:class:`MultiDictProxy <webargs.MultiDictProxy>`, depending on what the
-location loader returns.
+
+    # variant 2: applies to all locations
+    class WhitspaceStrippingParser(FlaskParser):
+        def load_location_data(self, *, schema, req, location):
+            data = super().load_location_data(schema=schema, req=req, location=location)
+            return _strip_whitespace(data)
+
+
+    # variant 3: applies to 'query', 'querystring', and 'form'
+    class WhitspaceStrippingFormAndQueryParser(FlaskParser):
+        def load_location_data(self, *, schema, req, location):
+            data = super().load_location_data(schema=schema, req=req, location=location)
+            if location in ("query", "querystring", "form"):
+                return _strip_whitespace(data)
+            return data
+
+Note that `Parser.load_location_data <webargs.core.Parser.load_location_data>` can
+return multiple types of mapping objects, including
+:class:`MultiDictProxy <webargs.MultiDictProxy>`, depending on what the concrete
+location loader method returns.
 
 Returning HTTP 400 Responses
 ----------------------------

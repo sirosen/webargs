@@ -6,9 +6,9 @@ Changelog
 
 Features:
 
-* Add `Parser.pre_load` as a method for allowing users to modify data before
-  schema loading, but without redefining location loaders. See advanced docs on
-  `Parser pre_load` for usage information
+* Make `Parser.load_location_data` (previously `_load_location_data`) a public method.
+  This allows users to modify data before schema loading in a new way. See advanced
+  docs on `Customizing Data Loading` for more information
 
 * Detection of fields as "multi-value" for unpacking lists from multi-dict
   types is now extensible with the `is_multiple` attribute. If a field sets
